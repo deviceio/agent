@@ -1,5 +1,5 @@
 package resources
 
-import "quantum/shared/logging"
+import "github.com/deviceio/shared/logging"
 
 var logger = &logging.DefaultLogger{}

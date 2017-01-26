@@ -2,10 +2,11 @@ package resources
 
 import (
 	"io"
-	"quantum/agent/resources/types"
-	"quantum/shared/logging"
-	"quantum/shared/protocol_v1"
 	"sync"
+
+	"github.com/deviceio/agent/resources/types"
+	"github.com/deviceio/shared/logging"
+	"github.com/deviceio/shared/protocol_v1"
 
 	"github.com/golang/protobuf/proto"
 )

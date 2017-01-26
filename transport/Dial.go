@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"quantum/shared/logging"
 	"strings"
+
+	"github.com/deviceio/shared/logging"
 
 	"github.com/gorilla/websocket"
 )

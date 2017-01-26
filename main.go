@@ -3,10 +3,11 @@ package main
 import (
 	"io"
 	"log"
-	"quantum/agent/resources"
-	"quantum/agent/transport"
-	"quantum/shared/config"
-	"quantum/shared/protocol_v1"
+
+	"github.com/deviceio/agent/resources"
+	"github.com/deviceio/agent/transport"
+	"github.com/deviceio/shared/config"
+	"github.com/deviceio/shared/protocol_v1"
 )
 
 func main() {
@@ -25,8 +26,8 @@ func main() {
 
 	config.SetConfigStruct(&configuration)
 	config.AddFileName("config.json")
-	config.AddFilePath("/etc/quantum/agent")
-	config.AddFilePath("c:/ProgramData/quantum/agent")
+	config.AddFilePath("/etc/github.com/deviceio/agent")
+	config.AddFilePath("c:/ProgramData/github.com/deviceio/agent")
 
 	if err := config.Parse(); err != nil {
 		log.Fatal(err)

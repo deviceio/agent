@@ -2,7 +2,8 @@ package resources
 
 import (
 	"io"
-	"quantum/shared/protocol_v1"
+
+	"github.com/deviceio/shared/protocol_v1"
 )
 
 // Resource ...

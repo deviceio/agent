@@ -2,8 +2,9 @@ package transport
 
 import (
 	"log"
-	"quantum/shared/logging"
-	"quantum/shared/protocol_v1"
+
+	"github.com/deviceio/shared/logging"
+	"github.com/deviceio/shared/protocol_v1"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"

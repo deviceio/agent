@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"quantum/shared/protocol_v1"
+
+	"github.com/deviceio/shared/protocol_v1"
 
 	"github.com/golang/protobuf/proto"
 )
