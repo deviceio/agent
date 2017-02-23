@@ -1,13 +1,6 @@
 package transport
 
-import (
-	"io"
-
-	"github.com/deviceio/shared/protocol_v1"
-)
-
-// Options ...
-type Options struct {
+type ConnectionOpts struct {
 	DisableTransportKeyPinning bool
 	AllowTransportSelfSigned   bool
 	ID                         string
@@ -15,8 +8,5 @@ type Options struct {
 	TransportPort              int
 	PasscodeHash               string
 	PasscodeSalt               string
-	ReconnectInterval          int
-	ReconnectJitter            int
 	Tags                       []string
-	HandleResource             func(*protocol_v1.Envelope, io.WriteCloser)
 }

@@ -1,16 +1,18 @@
 package main
 
 import (
-	"io"
 	"log"
+	"math/rand"
+	"time"
 
-	"github.com/deviceio/agent/resources"
+	_ "github.com/deviceio/agent/resources/filesystem"
 	"github.com/deviceio/agent/transport"
 	"github.com/deviceio/shared/config"
-	"github.com/deviceio/shared/protocol_v1"
 )
 
 func main() {
+	rand.Seed(time.Now().Unix()) //very important
+
 	var configuration struct {
 		DisableTransportKeyPinning bool
 		AllowTransportSelfSigned   bool
@@ -19,36 +21,27 @@ func main() {
 		TransportPort              int
 		PasscodeHash               string
 		PasscodeSalt               string
-		ReconnectInterval          int
-		ReconnectJitter            int
 		Tags                       []string
 	}
 
 	config.SetConfigStruct(&configuration)
 	config.AddFileName("config.json")
-	config.AddFilePath("/etc/github.com/deviceio/agent")
-	config.AddFilePath("c:/ProgramData/github.com/deviceio/agent")
+	config.AddFilePath("/etc/deviceio/agent")
+	config.AddFilePath("c:/ProgramData/deviceio/agent")
 
 	if err := config.Parse(); err != nil {
 		log.Fatal(err)
 	}
 
-	reshandler := resources.NewHandler()
-
-	go transport.Dial(&transport.Options{
+	(&transport.Connection{}).Dial(&transport.ConnectionOpts{
 		DisableTransportKeyPinning: configuration.DisableTransportKeyPinning,
 		AllowTransportSelfSigned:   configuration.AllowTransportSelfSigned,
-		ID:                configuration.ID,
-		TransportHost:     configuration.TransportHost,
-		TransportPort:     configuration.TransportPort,
-		PasscodeHash:      configuration.PasscodeHash,
-		PasscodeSalt:      configuration.PasscodeSalt,
-		ReconnectInterval: configuration.ReconnectInterval,
-		ReconnectJitter:   configuration.ReconnectJitter,
-		Tags:              configuration.Tags,
-		HandleResource: func(env *protocol_v1.Envelope, w io.WriteCloser) {
-			reshandler.Handle(env, w)
-		},
+		ID:            configuration.ID,
+		TransportHost: configuration.TransportHost,
+		TransportPort: configuration.TransportPort,
+		PasscodeHash:  configuration.PasscodeHash,
+		PasscodeSalt:  configuration.PasscodeSalt,
+		Tags:          configuration.Tags,
 	})
 
 	<-make(chan bool)

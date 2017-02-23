@@ -1,107 +1,85 @@
 package transport
 
 import (
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
+	"strings"
 
-	"github.com/deviceio/shared/logging"
-	"github.com/deviceio/shared/protocol_v1"
+	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
+	"github.com/hashicorp/yamux"
+	"github.com/jpillora/backoff"
 )
 
-type connection struct {
-	conn    *websocket.Conn
-	options *Options
-	writech chan []byte
-	logger  logging.Logger
+type Connection struct {
+	opts      *ConnectionOpts
+	reconnect int
+	jitter    int
+	backoff   *backoff.Backoff
 }
 
-func (t *connection) start() {
-	handshake := &protocol_v1.Handshake{
-		AgentID:      t.options.ID,
-		Hostname:     "TEST",
-		Platform:     "TEST",
-		Architecture: "TEST",
-		Tags:         make([]string, 0),
+func (t *Connection) Dial(opts *ConnectionOpts) {
+	t.opts = opts
+
+	t.backoff = &backoff.Backoff{
+		Max:    5 * time.Second,
+		Jitter: true,
 	}
 
-	handshakeb, err := proto.Marshal(handshake)
+	for {
+		err := t.run()
+		log.Println("Transport failure:", err)
+		wait := t.backoff.Duration()
+
+		if wait >= t.backoff.Max {
+			t.backoff.Reset()
+		}
+
+		log.Println(fmt.Sprintf("Reconnect in %v seconds", wait))
+		time.Sleep(wait)
+	}
+}
+
+func (t *Connection) run() error {
+	dialer := &websocket.Dialer{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: t.opts.AllowTransportSelfSigned,
+		},
+	}
+
+	url := fmt.Sprintf(
+		"wss://%v:%v/v1/connect",
+		t.opts.TransportHost,
+		t.opts.TransportPort,
+	)
+
+	conn, _, err := dialer.Dial(url, http.Header{})
 
 	if err != nil {
-		log.Println("Error marshaling handshale", err)
+		return err
 	}
 
-	envelope := &protocol_v1.Envelope{
-		Type: protocol_v1.Envelope_Handshake,
-		Data: handshakeb,
-	}
+	log.Println(strings.Join(
+		[]string{
+			"Transport up:",
+			fmt.Sprintf("LocalAddr=%v", conn.LocalAddr()),
+			fmt.Sprintf("RemoteAddr=%v", conn.RemoteAddr()),
+		},
+		" ",
+	))
 
-	envelopeb, err := proto.Marshal(envelope)
+	server, _ := yamux.Server(conn.UnderlyingConn(), nil)
 
-	if err != nil {
-		log.Println("Error marshalling envelope", err)
-	}
+	Router.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		encd := json.NewEncoder(w)
+		encd.Encode(t.opts)
+	})
 
-	go t.readLoop()
-	go t.writeLoop()
+	t.backoff.Reset()
 
-	t.writech <- envelopeb
-}
-
-func (t *connection) readLoop() {
-	for {
-		mt, mb, err := t.conn.ReadMessage()
-
-		if err != nil {
-			log.Println(err)
-			t.conn.Close()
-			return
-		}
-
-		if mt != websocket.BinaryMessage {
-			t.logger.Error("Invalid message type")
-			t.conn.Close()
-			return
-		}
-
-		envelope := &protocol_v1.Envelope{}
-
-		if err := proto.Unmarshal(mb, envelope); err != nil {
-			t.logger.Error(err.Error())
-			t.conn.Close()
-			return
-		}
-
-		w := &writer{
-			resv:  make(chan []byte),
-			close: make(chan bool),
-		}
-
-		go func() {
-			t.options.HandleResource(envelope, w)
-		}()
-
-		go func(w *writer) {
-			for {
-				select {
-				case b := <-w.resv:
-					t.writech <- b
-				case <-w.close:
-					return
-				}
-			}
-		}(w)
-	}
-}
-
-func (t *connection) writeLoop() {
-	for {
-		err := t.conn.WriteMessage(websocket.BinaryMessage, <-t.writech)
-		if err != nil {
-			log.Println(err)
-			t.conn.Close()
-			return
-		}
-	}
+	return http.Serve(server, Router)
 }
