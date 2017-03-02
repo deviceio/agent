@@ -4,24 +4,38 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strings"
 
 	"time"
 
+	"github.com/deviceio/shared/logging"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 )
 
+// Connection represents our upstream connection to a hub.
 type Connection struct {
 	opts      *ConnectionOpts
 	reconnect int
 	jitter    int
 	backoff   *backoff.Backoff
+	logger    logging.Logger
 }
 
+// NewConnection creates a new instance of the Connection type
+func NewConnection(logger logging.Logger) *Connection {
+	return &Connection{
+		logger: logger,
+	}
+}
+
+// Dial attempts to connect to the upstream hub. If dialing fails a backoff
+// algorithm is applied during reconnection attempts to alleviate load on a hub
+// that disappears momentarily.
 func (t *Connection) Dial(opts *ConnectionOpts) {
 	t.opts = opts
 
@@ -32,22 +46,37 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 
 	for {
 		err := t.run()
-		log.Println("Transport failure:", err)
+
+		t.logger.Warn(fmt.Sprintf(
+			"Transport Failure %v:%v : %v",
+			t.opts.TransportHost,
+			t.opts.TransportPort,
+			err.Error(),
+		))
+
 		wait := t.backoff.Duration()
 
 		if wait >= t.backoff.Max {
 			t.backoff.Reset()
 		}
 
-		log.Println(fmt.Sprintf("Reconnect in %v seconds", wait))
+		t.logger.Info(fmt.Sprintf(
+			"Reconnect %v:%v in %v seconds",
+			t.opts.TransportHost,
+			t.opts.TransportPort,
+			wait,
+		))
+
 		time.Sleep(wait)
 	}
 }
 
+// run conducts the setup of the multiplexed tcp stream server to the hub and registers
+// the base http server to be served over the multiplexed connection.
 func (t *Connection) run() error {
 	dialer := &websocket.Dialer{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: t.opts.AllowTransportSelfSigned,
+			InsecureSkipVerify: t.opts.TransportAllowSelfSigned,
 		},
 	}
 
@@ -63,7 +92,7 @@ func (t *Connection) run() error {
 		return err
 	}
 
-	log.Println(strings.Join(
+	t.logger.Info(strings.Join(
 		[]string{
 			"Transport up:",
 			fmt.Sprintf("LocalAddr=%v", conn.LocalAddr()),
@@ -74,12 +103,40 @@ func (t *Connection) run() error {
 
 	server, _ := yamux.Server(conn.UnderlyingConn(), nil)
 
-	Router.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
-		encd := json.NewEncoder(w)
-		encd.Encode(t.opts)
-	})
-
-	t.backoff.Reset()
+	Router.HandleFunc("/info", t.httpGetInfo)
 
 	return http.Serve(server, Router)
+}
+
+// httpGetInfo provides basic information about this device a hub needs to properly
+// manage the transport connection.
+func (t *Connection) httpGetInfo(w http.ResponseWriter, r *http.Request) {
+	type info struct {
+		ID           string
+		Hostname     string
+		Architecture string
+		Platform     string
+		Tags         []string
+	}
+
+	hostname, err := os.Hostname()
+
+	if err != nil {
+		hostname = "Unknown"
+	}
+
+	err = json.NewEncoder(w).Encode(&info{
+		ID:           t.opts.ID,
+		Tags:         t.opts.Tags,
+		Hostname:     hostname,
+		Architecture: runtime.GOARCH,
+		Platform:     runtime.GOOS,
+	})
+
+	if err != nil {
+		t.logger.Error(err.Error())
+		w.WriteHeader(500)
+		w.Write([]byte(""))
+		return
+	}
 }

@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -11,21 +10,11 @@ type filesystem struct {
 }
 
 func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
-	type model struct {
-		Path string `json:"path"`
-	}
+	flusher, _ := w.(http.Flusher)
 
-	var m *model
+	path := r.Header.Get("X-Path")
 
-	err := json.NewDecoder(r.Body).Decode(&m)
-
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	file, err := os.Open(m.Path)
+	file, err := os.Open(path)
 	defer file.Close()
 
 	if err != nil {
@@ -34,5 +23,29 @@ func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	io.Copy(w, file)
+	stat, err := file.Stat()
+
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(200)
+	w.Header().Set("Content-Length", string(stat.Size()))
+	w.Header().Set("Transfer-Encoding", "chunked")
+	flusher.Flush()
+
+	buf := make([]byte, 250000)
+	for {
+		i, err := file.Read(buf)
+
+		if err == io.EOF {
+			w.Write([]byte(""))
+			break
+		}
+
+		w.Write(buf[:i])
+		flusher.Flush()
+	}
 }
