@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/deviceio/shared/logging"
 )
@@ -13,29 +14,82 @@ type filesystem struct {
 }
 
 func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
-	//flusher, _ := w.(http.Flusher)
+	w.Header().Set("Trailer", "Error")
+	w.WriteHeader(200)
 
-	path := r.Header.Get("X-Path")
+	var file *os.File
+	var err error
+	var count int64 = -1
+	var offset int64
+	var offsetAt int
+	var path string
 
-	file, err := os.Open(path)
+	args := map[string]string{
+		"count":    r.Header.Get("X-Count"),
+		"offset":   r.Header.Get("X-Offset"),
+		"offsetAt": r.Header.Get("X-OffsetAt"),
+		"path":     r.Header.Get("X-Path"),
+	}
+
+	if count, err = strconv.ParseInt(args["count"], 10, 64); args["count"] != "" && err != nil {
+		w.Write([]byte(" "))
+		w.Header().Set("Error", err.Error())
+		return
+	}
+
+	if offset, err = strconv.ParseInt(args["offset"], 10, 64); args["offset"] != "" && err != nil {
+		w.Write([]byte(" "))
+		w.Header().Set("Error", err.Error())
+		return
+	}
+
+	if offsetAt, err = strconv.Atoi(args["offsetAt"]); args["offsetAt"] != "" && err != nil {
+		w.Write([]byte(" "))
+		w.Header().Set("Error", err.Error())
+		return
+	}
+
+	path = args["path"]
+
+	if file, err = os.Open(path); err != nil {
+		w.Write([]byte(" "))
+		w.Header().Set("Error", err.Error())
+		return
+	}
 	defer file.Close()
 
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
+	if offsetAt == 0 {
+		if _, err = file.Seek(offset, offsetAt); err != nil {
+			w.Write([]byte(" "))
+			w.Header().Set("Error", err.Error())
+			return
+		}
+	} else if offsetAt == 1 {
+		if _, err = file.Seek(offset, 2); err != nil {
+			w.Write([]byte(" "))
+			w.Header().Set("Error", err.Error())
+			return
+		}
+	} else {
+		w.Write([]byte(" "))
+		w.Header().Set("Error", "Unknown offsetAt code")
 		return
 	}
 
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
+	var curcnt int64
 	buf := make([]byte, 250000)
 
-	if _, err := io.CopyBuffer(w, file, buf); err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte(err.Error()))
+	if n, err := io.CopyBuffer(w, file, buf); err != nil {
+		curcnt += n
+
+		if err != io.EOF {
+			w.Write([]byte(" "))
+			w.Header().Set("Error", err.Error())
+			return
+		}
+
+		if count > 0 && curcnt > count {
+			return
+		}
 	}
 }
