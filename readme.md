@@ -1,3 +1,16 @@
+<!-- TOC -->
+
+- [Deviceio Agent](#deviceio-agent)
+- [Url Paths](#url-paths)
+- [Endpoints](#endpoints)
+- [RPC endpoints](#rpc-endpoints)
+    - [POST /rpc/filesystem/read](#post-rpcfilesystemread)
+        - [Argument Headers](#argument-headers)
+        - [Returns](#returns)
+        - [Trailers](#trailers)
+
+<!-- /TOC -->
+
 # Deviceio Agent
 
 The Deviceio Agent is a small binary that runs on a target host and connects to a Deviceio Hub. The agent provides an http api over its hub connection that developers and system administrators can use to orchestrate the target host machine.
@@ -20,7 +33,7 @@ in usage means calling the hub http api as follows:
 GET https://<hub>/device/<id>/rest/filesystem/{path}
 ```
 
-# Rest and Rpc endpoints
+# Endpoints
 
 Agents expose the different styles from root resource paths:
 
@@ -58,15 +71,3 @@ Byte content using `Transfer-Encoding: chunked` response streaming
 ### Trailers
 
 * `Error`: Any error that is observed during the read operation
-
-# REST endpoints
-## /rest/filesystem/{path}
-### GET
-### PUT
-### POST
-### DELETE
-### HEAD
-### OPTIONS
-# RPC endpoints
-
-
