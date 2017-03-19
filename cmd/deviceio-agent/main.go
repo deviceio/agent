@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/debug"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/deviceio/agent/installation"
@@ -52,6 +54,7 @@ func main() {
 	case serviceCommand.FullCommand():
 		if runtime.GOOS == "windows" {
 			svc.Run("deviceio agent", &winsvc{})
+			config.AddConfigPath(*serviceConfig)
 		} else {
 			panic("service mode is not supported on this system")
 		}
@@ -60,7 +63,6 @@ func main() {
 	}
 
 	var configuration *installation.Config
-
 	config.SetConfigStruct(&configuration)
 	config.AddConfigPath(*startConfig)
 
@@ -79,4 +81,34 @@ func main() {
 	})
 
 	<-make(chan bool)
+}
+
+var elog debug.Log
+
+type winsvc struct{}
+
+func (m *winsvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
+	changes <- svc.Status{State: svc.StartPending}
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+loop:
+	for {
+		select {
+		case c := <-r:
+			switch c.Cmd {
+			case svc.Interrogate:
+				changes <- c.CurrentStatus
+			case svc.Stop, svc.Shutdown:
+				break loop
+			case svc.Pause:
+				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
+			case svc.Continue:
+				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+			default:
+				elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+			}
+		}
+	}
+	changes <- svc.Status{State: svc.StopPending}
+	return
 }
