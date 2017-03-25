@@ -17,7 +17,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 	var err error
 
 	m := dsc.NewModule(map[string]dsc.Resource{
-		"agent-config": &dsc.File{
+		"config": &dsc.File{
 			Path: fmt.Sprintf("c:/PROGRA~1/deviceio/agent/%v/config.json", org),
 			Mode: 0700,
 			ContentFunc: func(f *dsc.File) ([]byte, error) {
@@ -47,7 +47,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 				return b.Bytes(), nil
 			},
 		},
-		"agent-binary": &dsc.File{
+		"binary": &dsc.File{
 			Path: fmt.Sprintf("c:/PROGRA~1/deviceio/agent/%v/bin/deviceio-agent.exe", org),
 			Mode: 0700,
 			ContentFunc: func(f *dsc.File) ([]byte, error) {
@@ -61,11 +61,11 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			},
 			Relation: &dsc.Relation{
 				Require: []string{
-					"agent-config",
+					"config",
 				},
 			},
 		},
-		"agent-service": &dsc.Service{
+		"service": &dsc.Service{
 			Name: fmt.Sprintf("Deviceio Agent (%v)", org),
 			Path: fmt.Sprintf(strings.Replace("c:/PROGRA~1/deviceio/agent/%v/bin/deviceio-agent.exe", "/", "\\", -1), org),
 			Args: []string{
@@ -75,7 +75,8 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			Started: true,
 			Relation: &dsc.Relation{
 				Require: []string{
-					"agent-binary",
+					"config",
+					"binary",
 				},
 			},
 		},

@@ -20,6 +20,22 @@ The remainder of this readme will document the Deviceio Agent API.
         - [4.1.1. Argument Headers](#411-argument-headers)
         - [4.1.2. Returns](#412-returns)
         - [4.1.3. Trailers](#413-trailers)
+    - [4.2. POST /rpc/filesystem/write](#42-post-rpcfilesystemwrite)
+        - [4.2.1. TBD](#421-tbd)
+    - [4.3. POST /rpc/filesystem/stat](#43-post-rpcfilesystemstat)
+        - [4.3.1. TBD](#431-tbd)
+    - [4.4. POST /rpc/filesystem/open](#44-post-rpcfilesystemopen)
+        - [4.4.1. TBD](#441-tbd)
+    - [4.5. POST /rpc/filesystem/delete](#45-post-rpcfilesystemdelete)
+        - [4.5.1. TBD](#451-tbd)
+    - [4.6. POST /rpc/filesystem/mklink](#46-post-rpcfilesystemmklink)
+        - [4.6.1. TBD](#461-tbd)
+    - [4.7. POST /rpc/filesystem/mkdir](#47-post-rpcfilesystemmkdir)
+        - [4.7.1. TBD](#471-tbd)
+    - [4.8. POST /rpc/filesystem/list](#48-post-rpcfilesystemlist)
+        - [4.8.1. TBD](#481-tbd)
+    - [4.9. POST /rpc/windows.registry/add](#49-post-rpcwindowsregistryadd)
+        - [4.9.1. TBD](#491-tbd)
 
 <!-- /TOC -->
 
@@ -75,3 +91,35 @@ Byte content using `Transfer-Encoding: chunked` response streaming
 ### 4.1.3. Trailers
 
 * `Error`: Any error that is observed during the read operation
+
+## 4.2. POST /rpc/filesystem/write
+
+### 4.2.1. TBD
+
+## 4.3. POST /rpc/filesystem/stat
+
+### 4.3.1. TBD
+
+## 4.4. POST /rpc/filesystem/open
+
+### 4.4.1. TBD
+
+## 4.5. POST /rpc/filesystem/delete
+
+### 4.5.1. TBD
+
+## 4.6. POST /rpc/filesystem/mklink
+
+### 4.6.1. TBD
+
+## 4.7. POST /rpc/filesystem/mkdir
+
+### 4.7.1. TBD
+
+## 4.8. POST /rpc/filesystem/list
+
+### 4.8.1. TBD
+
+## 4.9. POST /rpc/windows.registry/add
+
+### 4.9.1. TBD
