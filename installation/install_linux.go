@@ -18,7 +18,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 	config := fmt.Sprintf("/opt/deviceio/agent/%v/config.json", org)
 	binary := fmt.Sprintf("/opt/deviceio/agent/%v/bin/deviceio-agent", org)
 
-	m := dsc.NewModule(map[string]Resource{
+	m := dsc.NewModule(map[string]dsc.Resource{
 		"config": &dsc.File{
 			Path: config,
 			Mode: 0700,
