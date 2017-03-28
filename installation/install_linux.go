@@ -69,7 +69,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 				binary,
 			},
 			Relation: &dsc.Relation{
-				Requires: []string{
+				Require: []string{
 					"binary",
 				},
 			},
@@ -83,7 +83,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			},
 			Started: true,
 			Relation: &dsc.Relation{
-				Requires: []string{
+				Require: []string{
 					"binary",
 					"binary-chmod",
 					"config",
