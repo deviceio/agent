@@ -15,9 +15,12 @@ import (
 func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 	var err error
 
+	config := fmt.Sprintf("/opt/deviceio/agent/%v/config.json", org)
+	binary := fmt.Sprintf("/opt/deviceio/agent/%v/bin/deviceio-agent", org)
+
 	m := dsc.NewModule(map[string]Resource{
 		"config": &dsc.File{
-			Path: fmt.Sprintf("/opt/deviceio/agent/%v/config.json", org),
+			Path: config,
 			Mode: 0700,
 			ContentFunc: func(f *dsc.File) ([]byte, error) {
 				var b *bytes.Buffer
@@ -47,7 +50,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			},
 		},
 		"binary": &dsc.File{
-			Path: fmt.Sprintf("/opt/deviceio/agent/%v/bin/deviceio-agent", org),
+			Path: binary,
 			Mode: 0700,
 			ContentFunc: func(f *dsc.File) ([]byte, error) {
 				exe, err := os.Executable()
@@ -63,7 +66,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			Cmd: "chmod",
 			Args: []string{
 				"+x",
-				fmt.Sprintf("/opt/deviceio/agent/%v/bin/deviceio-agent", org),
+				binary,
 			},
 			Relation: &dsc.Relation{
 				Requires: []string{
@@ -76,7 +79,7 @@ func Install(org string, huburl string, hubport int, hubSelfSigned bool) error {
 			Path: fmt.Sprintf("/opt/deviceio/agent/%v/bin/deviceio-agent", org),
 			Args: []string{
 				"service",
-				fmt.Sprintf("/opt/deviceio/agent/%v/config.json", org),
+				config,
 			},
 			Started: true,
 			Relation: &dsc.Relation{
