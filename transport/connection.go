@@ -87,7 +87,6 @@ func (t *Connection) run() error {
 	)
 
 	conn, _, err := dialer.Dial(url, http.Header{})
-
 	if err != nil {
 		return err
 	}
