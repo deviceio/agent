@@ -48,6 +48,7 @@ func main() {
 
 	viper.SetConfigName("config")
 	viper.AddConfigPath(fmt.Sprintf("%v/.deviceio/agent/", homedir))
+	viper.AddConfigPath("$HOME/.deviceio/agent/")
 	viper.AddConfigPath("/etc/deviceio/agent/")
 	viper.AddConfigPath("/opt/deviceio/agent/")
 	viper.AddConfigPath("c:/PROGRA~1/deviceio/agent/")

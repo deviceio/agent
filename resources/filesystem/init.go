@@ -17,9 +17,9 @@ func init() {
 	}
 
 	transport.Router.HandleFunc("/filesystem", fs.get).Methods("GET")
-	//transport.Router.HandleFunc("/filesystem/handles", fs.handles.get).Methods("GET")
-	//transport.Router.HandleFunc("/filesystem/handles/{index}", fs.handles.getitem).Methods("GET")
-	//transport.Router.HandleFunc("/filesystem/open", fs.open).Methods("POST")
+	transport.Router.HandleFunc("/filesystem/handle", fs.handles.get).Methods("GET")
+	transport.Router.HandleFunc("/filesystem/handle/{index}", fs.handles.getitem).Methods("GET")
+	transport.Router.HandleFunc("/filesystem/open", fs.open).Methods("POST")
 	transport.Router.HandleFunc("/filesystem/read", fs.read).Methods("POST")
 	transport.Router.HandleFunc("/filesystem/write", fs.write).Methods("POST")
 }

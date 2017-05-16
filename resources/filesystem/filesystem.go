@@ -12,6 +12,7 @@ import (
 
 	"github.com/deviceio/hmapi"
 	"github.com/deviceio/shared/logging"
+	"github.com/google/uuid"
 )
 
 type filesystem struct {
@@ -20,16 +21,18 @@ type filesystem struct {
 }
 
 func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
+	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
+
 	resource := &hmapi.Resource{
 		Links: map[string]*hmapi.Link{
 			"handles": &hmapi.Link{
-				Href: "/filesystem/handles",
+				Href: parentPath + "/filesystem/handle",
 				Type: hmapi.MediaTypeJSON,
 			},
 		},
 		Forms: map[string]*hmapi.Form{
 			"read": &hmapi.Form{
-				Action:  r.Header.Get("X-Forwarded-Host") + "/filesystem/read",
+				Action:  parentPath + "/filesystem/read",
 				Method:  "POST",
 				Type:    hmapi.MediaTypeOctetStream,
 				Enctype: hmapi.MediaTypeMultipartFormData,
@@ -60,7 +63,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 				},
 			},
 			"write": &hmapi.Form{
-				Action:  r.Header.Get("X-Forwarded-Host") + "/filesystem/write",
+				Action:  parentPath + "/filesystem/write",
 				Method:  "POST",
 				Type:    hmapi.MediaTypeHMAPIInt,
 				Enctype: hmapi.MediaTypeMultipartFormData,
@@ -84,7 +87,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 				},
 			},
 			"open": &hmapi.Form{
-				Action:  "/filesystem/open",
+				Action:  parentPath + "/filesystem/open",
 				Method:  "POST",
 				Type:    hmapi.MediaTypeJSON,
 				Enctype: hmapi.MediaTypeMultipartFormData,
@@ -118,7 +121,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 		Content: map[string]*hmapi.Content{},
 	}
 
-	rw.Header().Set("Content-Type", "application/json")
+	rw.Header().Set("Content-Type", hmapi.MediaTypeJSON.String())
 	rw.WriteHeader(http.StatusOK)
 	json.NewEncoder(rw).Encode(&resource)
 }
@@ -197,23 +200,52 @@ func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var curcnt int64
+	var currcnt int64
 	buf := make([]byte, 250000)
 
 	// start chunk writing
 	w.Header().Set("Trailer", "Error")
+	w.Header().Set("Content-Type", hmapi.MediaTypeOctetStream.String())
 	w.WriteHeader(200)
 
-	if n, err := io.CopyBuffer(w, file, buf); err != nil {
-		curcnt += n
+	flusher, flusherok := w.(http.Flusher)
 
-		if err != io.EOF {
-			w.Write([]byte(" "))
+	for {
+		nr, rerr := file.Read(buf)
+
+		if rerr != nil && rerr != io.EOF {
+			w.Write([]byte(""))
 			w.Header().Set("Error", err.Error())
 			return
 		}
 
-		if count > 0 && curcnt > count {
+		if rerr != nil && rerr == io.EOF {
+			w.Write([]byte(""))
+			w.Header().Set("Error", "")
+			return
+		}
+
+		if nr == 0 {
+			continue
+		}
+
+		nw, werr := w.Write(buf[:nr])
+
+		if flusherok {
+			flusher.Flush()
+		}
+
+		if werr != nil {
+			w.Write([]byte(""))
+			w.Header().Set("Error", err.Error())
+			return
+		}
+
+		currcnt += int64(nw)
+
+		if count > 0 && currcnt >= count {
+			w.Write([]byte(""))
+			w.Header().Set("Error", "")
 			return
 		}
 	}
@@ -265,10 +297,10 @@ func (t *filesystem) write(rw http.ResponseWriter, r *http.Request) {
 
 			appendFile = b
 		} else if part.FormName() == "data" {
-			flag := os.O_RDWR | os.O_TRUNC
+			flag := os.O_RDWR | os.O_TRUNC | os.O_CREATE
 
 			if appendFile {
-				flag = os.O_RDWR | os.O_APPEND
+				flag = os.O_RDWR | os.O_APPEND | os.O_CREATE
 			}
 
 			file, err = os.OpenFile(path, flag, 0777)
@@ -330,7 +362,10 @@ func (t *filesystem) open(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uuid, _ := uuid.NewRandom()
+
 	handle := &handle{
+		id:   uuid.String(),
 		file: file,
 	}
 

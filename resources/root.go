@@ -14,21 +14,23 @@ type root struct {
 }
 
 func (t *root) get(rw http.ResponseWriter, r *http.Request) {
+	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
+
 	resource := &hmapi.Resource{
 		Links: map[string]*hmapi.Link{
 			"system": &hmapi.Link{
 				Type: hmapi.MediaTypeJSON,
-				Href: "/system",
+				Href: parentPath + "/system",
 			},
 			"filesystem": &hmapi.Link{
 				Type: hmapi.MediaTypeJSON,
-				Href: "/filesystem",
+				Href: parentPath + "/filesystem",
 			},
 		},
 		Content: map[string]*hmapi.Content{
 			"id": &hmapi.Content{
 				Type:  hmapi.MediaTypeHMAPIString,
-				Value: viper.GetString("id"),
+				Value: viper.GetString("id"), //TODO: this needs to be passed in
 			},
 			"hostname": &hmapi.Content{
 				Type: hmapi.MediaTypeHMAPIString,

@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/deviceio/shared/logging"
-	"github.com/gorilla/websocket"
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 )
@@ -47,12 +46,11 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 	for {
 		err := t.run()
 
-		t.logger.Warn(fmt.Sprintf(
-			"Transport Failure %v:%v : %v",
-			t.opts.TransportHost,
-			t.opts.TransportPort,
-			err.Error(),
-		))
+		logrus.WithFields(logrus.Fields{
+			"host":  t.opts.TransportHost,
+			"port":  t.opts.TransportPort,
+			"error": err.Error(),
+		}).Warn("transport failure")
 
 		wait := t.backoff.Duration()
 
@@ -60,12 +58,11 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 			t.backoff.Reset()
 		}
 
-		t.logger.Info(fmt.Sprintf(
-			"Reconnect %v:%v in %v seconds",
-			t.opts.TransportHost,
-			t.opts.TransportPort,
-			wait,
-		))
+		logrus.WithFields(logrus.Fields{
+			"host": t.opts.TransportHost,
+			"port": t.opts.TransportPort,
+			"wait": wait,
+		}).Info("transport retry")
 
 		time.Sleep(wait)
 	}
@@ -74,33 +71,26 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 // run conducts the setup of the multiplexed tcp stream server to the hub and registers
 // the base http server to be served over the multiplexed connection.
 func (t *Connection) run() error {
-	dialer := &websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: t.opts.TransportAllowSelfSigned,
-		},
-	}
+	dialaddr := fmt.Sprintf("%v:%v", t.opts.TransportHost, t.opts.TransportPort)
 
-	url := fmt.Sprintf(
-		"wss://%v:%v/v1/connect",
-		t.opts.TransportHost,
-		t.opts.TransportPort,
-	)
+	conn, err := tls.Dial("tcp", dialaddr, &tls.Config{
+		InsecureSkipVerify: t.opts.TransportAllowSelfSigned,
+	})
 
-	conn, _, err := dialer.Dial(url, http.Header{})
 	if err != nil {
 		return err
 	}
 
-	t.logger.Info(strings.Join(
-		[]string{
-			"Transport up:",
-			fmt.Sprintf("LocalAddr=%v", conn.LocalAddr()),
-			fmt.Sprintf("RemoteAddr=%v", conn.RemoteAddr()),
-		},
-		" ",
-	))
+	logrus.WithFields(logrus.Fields{
+		"localAddr":  conn.LocalAddr(),
+		"remoteAddr": conn.RemoteAddr(),
+	}).Info("transport up")
 
-	server, _ := yamux.Server(conn.UnderlyingConn(), nil)
+	server, err := yamux.Server(conn, nil)
+
+	if err != nil {
+		return err
+	}
 
 	Router.HandleFunc("/info", t.httpGetInfo)
 
@@ -123,6 +113,8 @@ func (t *Connection) httpGetInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		hostname = "Unknown"
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	err = json.NewEncoder(w).Encode(&info{
 		ID:           t.opts.ID,
