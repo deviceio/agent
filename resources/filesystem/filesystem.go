@@ -12,24 +12,17 @@ import (
 
 	"github.com/deviceio/hmapi"
 	"github.com/deviceio/shared/logging"
-	"github.com/google/uuid"
 )
 
 type filesystem struct {
-	logger  logging.Logger
-	handles *handleCollection
+	logger logging.Logger
 }
 
 func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 
 	resource := &hmapi.Resource{
-		Links: map[string]*hmapi.Link{
-			"handles": &hmapi.Link{
-				Href: parentPath + "/filesystem/handle",
-				Type: hmapi.MediaTypeJSON,
-			},
-		},
+		Links: map[string]*hmapi.Link{},
 		Forms: map[string]*hmapi.Form{
 			"read": &hmapi.Form{
 				Action:  parentPath + "/filesystem/read",
@@ -83,37 +76,6 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 						Name:     "data",
 						Type:     hmapi.MediaTypeOctetStream,
 						Required: true,
-					},
-				},
-			},
-			"open": &hmapi.Form{
-				Action:  parentPath + "/filesystem/open",
-				Method:  "POST",
-				Type:    hmapi.MediaTypeJSON,
-				Enctype: hmapi.MediaTypeMultipartFormData,
-				Fields: []*hmapi.FormField{
-					&hmapi.FormField{
-						Name:     "path",
-						Type:     hmapi.MediaTypeHMAPIString,
-						Required: true,
-					},
-					&hmapi.FormField{
-						Name:     "writable",
-						Type:     hmapi.MediaTypeHMAPIBoolean,
-						Required: false,
-						Value:    false,
-					},
-					&hmapi.FormField{
-						Name:     "create",
-						Type:     hmapi.MediaTypeHMAPIBoolean,
-						Required: false,
-						Value:    false,
-					},
-					&hmapi.FormField{
-						Name:     "exclusive",
-						Type:     hmapi.MediaTypeHMAPIBoolean,
-						Required: false,
-						Value:    true,
 					},
 				},
 			},
@@ -323,57 +285,4 @@ func (t *filesystem) write(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func (t *filesystem) open(rw http.ResponseWriter, r *http.Request) {
-	var err error
-	var file *os.File
-
-	err = r.ParseMultipartForm(4096)
-
-	if err != nil {
-		rw.WriteHeader(http.StatusBadRequest)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	writable := r.FormValue("writable")
-	create := r.FormValue("create")
-	path := r.FormValue("path")
-	exclusive := r.FormValue("exclusive")
-
-	flag := os.O_RDONLY
-
-	if writable == "true" {
-		flag = flag | os.O_RDWR
-	}
-
-	if create == "true" {
-		flag = flag | os.O_CREATE
-	}
-
-	if exclusive == "" || exclusive == "true" {
-		flag = flag | os.O_EXCL
-	}
-
-	if file, err = os.OpenFile(path, flag, 0777); err != nil {
-		rw.WriteHeader(http.StatusBadRequest)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	uuid, _ := uuid.NewRandom()
-
-	handle := &handle{
-		id:   uuid.String(),
-		file: file,
-	}
-
-	t.handles.mutex.Lock()
-	defer t.handles.mutex.Unlock()
-
-	t.handles.items = append(t.handles.items, handle)
-
-	rw.Header().Set("Location", "/filesystem/handles/"+strconv.Itoa(len(t.handles.items)-1))
-	rw.WriteHeader(201)
 }

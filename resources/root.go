@@ -18,9 +18,9 @@ func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 
 	resource := &hmapi.Resource{
 		Links: map[string]*hmapi.Link{
-			"system": &hmapi.Link{
+			"process": &hmapi.Link{
 				Type: hmapi.MediaTypeJSON,
-				Href: parentPath + "/system",
+				Href: parentPath + "/process",
 			},
 			"filesystem": &hmapi.Link{
 				Type: hmapi.MediaTypeJSON,
