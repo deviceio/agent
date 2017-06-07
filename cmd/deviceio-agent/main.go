@@ -6,13 +6,14 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/alecthomas/kingpin"
 	_ "github.com/deviceio/agent/resources"
 	_ "github.com/deviceio/agent/resources/filesystem"
+	_ "github.com/deviceio/agent/resources/process"
 	"github.com/deviceio/agent/transport"
 	"github.com/deviceio/shared/logging"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (

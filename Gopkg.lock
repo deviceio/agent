@@ -2,10 +2,16 @@
 
 
 [[projects]]
-  branch = "master"
   name = "github.com/Sirupsen/logrus"
   packages = ["."]
-  revision = "5b60b3d3ee017ed00bcd0225fcca7acab767844b"
+  revision = "ba1b36c82c5e05c4f912a88eab0dcd91a171688f"
+  version = "v0.11.5"
+
+[[projects]]
+  name = "github.com/alecthomas/kingpin"
+  packages = ["."]
+  revision = "7f0871f2e17818990e4eed73f9b5c2f429501228"
+  version = "v2.2.4"
 
 [[projects]]
   branch = "master"
@@ -29,7 +35,7 @@
   branch = "master"
   name = "github.com/deviceio/hmapi"
   packages = ["."]
-  revision = "21ae8c1d51f19b7fff011e6f789116a742487186"
+  revision = "f099ba52e839c6a9e04dc1bc8f147475301ba716"
 
 [[projects]]
   branch = "master"
@@ -38,34 +44,34 @@
   revision = "d0178d4b8d35939753b91c90d9160539f7adf135"
 
 [[projects]]
-  branch = "master"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
-  revision = "4da3e2cfbabc9f751898f250b49f2439785783a1"
+  revision = "629574ca2a5df945712d3079857300b5e4da0236"
+  version = "v1.4.2"
 
 [[projects]]
-  branch = "master"
   name = "github.com/google/uuid"
   packages = ["."]
-  revision = "6a5e28554805e78ea6141142aba763936c4761c0"
+  revision = "064e2069ce9c359c118179501254f67d7d37ba24"
+  version = "0.2"
 
 [[projects]]
-  branch = "master"
   name = "github.com/gorilla/context"
   packages = ["."]
-  revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
+  revision = "1ea25387ff6f684839d82767c1733ff4d4d15d0a"
+  version = "v1.1"
 
 [[projects]]
-  branch = "master"
   name = "github.com/gorilla/mux"
   packages = ["."]
-  revision = "4c1c3952b7d9d0a061a3fa7b36fd373ba0398ebc"
+  revision = "bcd8bc72b08df0f70df986b97f95590779502d31"
+  version = "v1.4.0"
 
 [[projects]]
   branch = "master"
   name = "github.com/hashicorp/hcl"
   packages = [".","hcl/ast","hcl/parser","hcl/scanner","hcl/strconv","hcl/token","json/parser","json/scanner","json/token"]
-  revision = "a4b07c25de5ff55ad3b8936cea69a79a3d95a855"
+  revision = "392dba7d905ed5d04a5794ba89f558b27e2ba1ca"
 
 [[projects]]
   branch = "master"
@@ -80,10 +86,10 @@
   revision = "06c7a16c845dc8e0bf575fafeeca0f5462f5eb4d"
 
 [[projects]]
-  branch = "master"
   name = "github.com/magiconair/properties"
   packages = ["."]
-  revision = "51463bfca2576e06c62a8504b5c0f06d61312647"
+  revision = "f917359f079a3759162704eaa8caeec3d01d9f91"
+  version = "v1.7.2"
 
 [[projects]]
   branch = "master"
@@ -95,19 +101,19 @@
   branch = "master"
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
-  revision = "cc8532a8e9a55ea36402aa21efdf403a60d34096"
+  revision = "d0303fe809921458f417bcf828397a65db30a7e4"
 
 [[projects]]
-  branch = "master"
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
+  version = "v0.2.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
-  revision = "23f644976aa7c724adf4aec911dadf4af17840ab"
+  revision = "5ccdfb18c776b740aecaf085c4d9a2779199c279"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -116,22 +122,22 @@
   revision = "9be650865eab0c12963d8753212f4f9c66cdcf12"
 
 [[projects]]
-  branch = "master"
   name = "github.com/spf13/cast"
   packages = ["."]
   revision = "acbeb36b902d72a7a4c18e8f3241075e7ab763e4"
+  version = "v1.1.0"
 
 [[projects]]
   branch = "master"
   name = "github.com/spf13/jwalterweatherman"
   packages = ["."]
-  revision = "fa7ca7e836cf3a8bb4ebf799f472c12d7e903d66"
+  revision = "0efa5202c04663c757d84f90f5219c1250baf94f"
 
 [[projects]]
   branch = "master"
   name = "github.com/spf13/pflag"
   packages = ["."]
-  revision = "80fe0fb4eba54167e2ccae1c6c950e72abf61b73"
+  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
 
 [[projects]]
   branch = "master"
@@ -143,19 +149,13 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows","windows/svc","windows/svc/mgr"]
-  revision = "9ccfe848b9db8435a24c424abbc07a921adf1df5"
+  revision = "b90f89a1e7a9c1f6b918820b3daa7f08488c8594"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","transform","unicode/cldr","unicode/norm"]
-  revision = "470f45bf29f4147d6fbd7dfd0a02a848e49f5bf4"
-
-[[projects]]
-  branch = "master"
-  name = "gopkg.in/alecthomas/kingpin.v2"
-  packages = ["."]
-  revision = "7f0871f2e17818990e4eed73f9b5c2f429501228"
+  revision = "ccbd3f7822129ff389f8ca4858a9b9d4d910531c"
 
 [[projects]]
   branch = "v2"
@@ -166,6 +166,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9d02ed0fb8f78a1273ac434703026fe78deb23ee802998c2cdd83b9c3c5882d1"
+  inputs-digest = "81ed9059ed42a96e7751c9df40dff8418cc4f58688a6122a64c868deaa7c3553"
   solver-name = "gps-cdcl"
   solver-version = 1

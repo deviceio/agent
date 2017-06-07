@@ -14,11 +14,11 @@ import (
 	"github.com/deviceio/shared/logging"
 )
 
-type filesystem struct {
+type Root struct {
 	logger logging.Logger
 }
 
-func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 
 	resource := &hmapi.Resource{
@@ -26,7 +26,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 		Forms: map[string]*hmapi.Form{
 			"read": &hmapi.Form{
 				Action:  parentPath + "/filesystem/read",
-				Method:  "POST",
+				Method:  hmapi.POST,
 				Type:    hmapi.MediaTypeOctetStream,
 				Enctype: hmapi.MediaTypeMultipartFormData,
 				Fields: []*hmapi.FormField{
@@ -57,7 +57,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 			},
 			"write": &hmapi.Form{
 				Action:  parentPath + "/filesystem/write",
-				Method:  "POST",
+				Method:  hmapi.POST,
 				Type:    hmapi.MediaTypeHMAPIInt,
 				Enctype: hmapi.MediaTypeMultipartFormData,
 				Fields: []*hmapi.FormField{
@@ -88,7 +88,7 @@ func (t *filesystem) get(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(&resource)
 }
 
-func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
+func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 	var file *os.File
 	var err error
 	var count int64 = -1
@@ -213,7 +213,7 @@ func (t *filesystem) read(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *filesystem) write(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) Write(rw http.ResponseWriter, r *http.Request) {
 	var file *os.File
 	var form *multipart.Reader
 	var err error

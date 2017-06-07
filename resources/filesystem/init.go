@@ -6,11 +6,11 @@ import (
 )
 
 func init() {
-	fs := &filesystem{
+	fs := &Root{
 		logger: &logging.DefaultLogger{},
 	}
 
-	transport.Router.HandleFunc("/filesystem", fs.get).Methods("GET")
-	transport.Router.HandleFunc("/filesystem/read", fs.read).Methods("POST")
-	transport.Router.HandleFunc("/filesystem/write", fs.write).Methods("POST")
+	transport.Router.HandleFunc("/filesystem", fs.Get).Methods("GET")
+	transport.Router.HandleFunc("/filesystem/read", fs.Read).Methods("POST")
+	transport.Router.HandleFunc("/filesystem/write", fs.Write).Methods("POST")
 }

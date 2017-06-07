@@ -67,8 +67,12 @@
 
 
 [[constraint]]
-  branch = "master"
   name = "github.com/Sirupsen/logrus"
+  version = "0.11.5"
+
+[[constraint]]
+  name = "github.com/alecthomas/kingpin"
+  version = "2.2.4"
 
 [[constraint]]
   branch = "master"
@@ -83,12 +87,12 @@
   name = "github.com/deviceio/shared"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/google/uuid"
+  version = "0.2.0"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/gorilla/mux"
+  version = "1.4.0"
 
 [[constraint]]
   branch = "master"
@@ -108,4 +112,4 @@
 
 [[constraint]]
   branch = "master"
-  name = "gopkg.in/alecthomas/kingpin.v2"
+  name = "golang.org/x/sys"

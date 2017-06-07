@@ -2,9 +2,11 @@ package resources
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/deviceio/hmapi"
 	"github.com/spf13/viper"
@@ -53,4 +55,31 @@ func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	json.NewEncoder(rw).Encode(&resource)
+}
+
+func (t *root) chunkedResponseTest(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusOK)
+
+	httpflush := rw.(http.Flusher).Flush
+	httpclose := rw.(http.CloseNotifier).CloseNotify()
+	pipeReader, pipeWriter := io.Pipe()
+
+	httpflush()
+
+	go func() {
+		for {
+			select {
+			case <-httpclose:
+				pipeWriter.Close()
+				return
+			default:
+				pipeWriter.Write([]byte("test"))
+				httpflush()
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	io.Copy(rw, pipeReader)
 }
