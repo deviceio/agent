@@ -24,30 +24,24 @@ func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 	resource := &hmapi.Resource{
 		Links: map[string]*hmapi.Link{},
 		Forms: map[string]*hmapi.Form{
-			"read": &hmapi.Form{
+			"read": {
 				Action:  parentPath + "/filesystem/read",
 				Method:  hmapi.POST,
 				Type:    hmapi.MediaTypeOctetStream,
 				Enctype: hmapi.MediaTypeMultipartFormData,
 				Fields: []*hmapi.FormField{
-					&hmapi.FormField{
+					{
 						Name:     "path",
 						Type:     hmapi.MediaTypeHMAPIString,
 						Required: true,
 					},
-					&hmapi.FormField{
+					{
 						Name:     "offset",
 						Type:     hmapi.MediaTypeHMAPIInt,
 						Required: false,
 						Value:    0,
 					},
-					&hmapi.FormField{
-						Name:     "offsetAt",
-						Type:     hmapi.MediaTypeHMAPIInt,
-						Required: false,
-						Value:    0,
-					},
-					&hmapi.FormField{
+					{
 						Name:     "count",
 						Type:     hmapi.MediaTypeHMAPIInt,
 						Required: false,
@@ -55,24 +49,24 @@ func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 					},
 				},
 			},
-			"write": &hmapi.Form{
+			"write": {
 				Action:  parentPath + "/filesystem/write",
 				Method:  hmapi.POST,
 				Type:    hmapi.MediaTypeHMAPIInt,
 				Enctype: hmapi.MediaTypeMultipartFormData,
 				Fields: []*hmapi.FormField{
-					&hmapi.FormField{
+					{
 						Name:     "path",
 						Type:     hmapi.MediaTypeHMAPIString,
 						Required: true,
 					},
-					&hmapi.FormField{
+					{
 						Name:     "append",
 						Type:     hmapi.MediaTypeHMAPIBoolean,
 						Required: false,
 						Value:    false,
 					},
-					&hmapi.FormField{
+					{
 						Name:     "data",
 						Type:     hmapi.MediaTypeOctetStream,
 						Required: true,
@@ -93,7 +87,6 @@ func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var count int64 = -1
 	var offset int64
-	var offsetAt int
 	var path string
 
 	err = r.ParseMultipartForm(4096)
@@ -105,10 +98,9 @@ func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 	}
 
 	args := map[string]string{
-		"count":    r.FormValue("count"),
-		"offset":   r.FormValue("offset"),
-		"offsetAt": r.FormValue("offsetAt"),
-		"path":     r.FormValue("path"),
+		"count":  r.FormValue("count"),
+		"offset": r.FormValue("offset"),
+		"path":   r.FormValue("path"),
 	}
 
 	if args["path"] == "" {
@@ -129,12 +121,6 @@ func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if offsetAt, err = strconv.Atoi(args["offsetAt"]); args["offsetAt"] != "" && err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
 	path = args["path"]
 
 	if file, err = os.Open(path); err != nil {
@@ -144,21 +130,9 @@ func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	if offsetAt == 0 {
-		if _, err = file.Seek(offset, offsetAt); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			return
-		}
-	} else if offsetAt == 1 {
-		if _, err = file.Seek(offset, 2); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			return
-		}
-	} else {
+	if _, err = file.Seek(offset, 0); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Unknown OffsetAt Code"))
+		w.Write([]byte(err.Error()))
 		return
 	}
 
@@ -276,6 +250,12 @@ func (t *Root) Write(rw http.ResponseWriter, r *http.Request) {
 
 			if _, err = io.Copy(file, part); err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(err.Error()))
+				return
+			}
+
+			if err := file.Sync(); err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
 				rw.Write([]byte(err.Error()))
 				return
 			}

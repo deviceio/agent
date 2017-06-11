@@ -13,12 +13,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type root struct {
-	itemsmu *sync.Mutex
-	items   map[string]*process
+type Root struct {
+	Itemsmu *sync.Mutex
+	Items   map[string]*process
 }
 
-func (t *root) get(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 
 	resource := &hmapi.Resource{
@@ -34,7 +34,7 @@ func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 						Required: true,
 					},
 					&hmapi.FormField{
-						Name:     "args",
+						Name:     "arg",
 						Type:     hmapi.MediaTypeHMAPIString,
 						Multiple: true,
 					},
@@ -45,15 +45,15 @@ func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 		Links:   map[string]*hmapi.Link{},
 	}
 
-	t.itemsmu.Lock()
-	defer t.itemsmu.Unlock()
+	t.Itemsmu.Lock()
+	defer t.Itemsmu.Unlock()
 
 	resource.Content["process-list"] = &hmapi.Content{
 		Type:  hmapi.MediaTypeJSON,
-		Value: t.items,
+		Value: t.Items,
 	}
 
-	for id := range t.items {
+	for id := range t.Items {
 		resource.Links[id] = &hmapi.Link{
 			Href: parentPath + "/process/" + id,
 			Type: hmapi.MediaTypeHMAPIResource,
@@ -65,7 +65,7 @@ func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(&resource)
 }
 
-func (t *root) createProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) CreateProcess(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 	formReader, err := r.MultipartReader()
 
@@ -105,8 +105,8 @@ func (t *root) createProcess(rw http.ResponseWriter, r *http.Request) {
 		args = []string{}
 	}
 
-	t.itemsmu.Lock()
-	defer t.itemsmu.Unlock()
+	t.Itemsmu.Lock()
+	defer t.Itemsmu.Unlock()
 
 	procid, _ := uuid.NewRandom()
 
@@ -120,7 +120,7 @@ func (t *root) createProcess(rw http.ResponseWriter, r *http.Request) {
 		cancel: cancel,
 	}
 
-	t.items[procid.String()] = proc
+	t.Items[procid.String()] = proc
 
 	rw.Header().Set("Location", fmt.Sprintf(
 		"%v/%v/%v",
@@ -133,7 +133,7 @@ func (t *root) createProcess(rw http.ResponseWriter, r *http.Request) {
 	rw.Write([]byte(""))
 }
 
-func (t *root) getProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) GetProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -146,7 +146,7 @@ func (t *root) getProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.get(rw, r)
 }
 
-func (t *root) deleteProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) DeleteProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -156,13 +156,13 @@ func (t *root) deleteProcess(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proc.stop(rw, r)
-	delete(t.items, vars["proc-id"])
+	proc.cancel()
+	delete(t.Items, vars["proc-id"])
 
-	rw.WriteHeader(http.StatusNoContent)
+	rw.WriteHeader(http.StatusOK)
 }
 
-func (t *root) startProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) StartProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -175,7 +175,7 @@ func (t *root) startProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.start(rw, r)
 }
 
-func (t *root) stopProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) StopProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -188,7 +188,7 @@ func (t *root) stopProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stop(rw, r)
 }
 
-func (t *root) stdinProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) StdinProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -201,7 +201,7 @@ func (t *root) stdinProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stdin(rw, r)
 }
 
-func (t *root) stdoutProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) StdoutProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -214,7 +214,7 @@ func (t *root) stdoutProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stdout(rw, r)
 }
 
-func (t *root) stderrProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *Root) StderrProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	proc := t.findProcessItem(vars["proc-id"])
 
@@ -227,11 +227,11 @@ func (t *root) stderrProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stderr(rw, r)
 }
 
-func (t *root) findProcessItem(processid string) *process {
-	t.itemsmu.Lock()
-	defer t.itemsmu.Unlock()
+func (t *Root) findProcessItem(processid string) *process {
+	t.Itemsmu.Lock()
+	defer t.Itemsmu.Unlock()
 
-	proc, ok := t.items[processid]
+	proc, ok := t.Items[processid]
 
 	if !ok {
 		return nil
