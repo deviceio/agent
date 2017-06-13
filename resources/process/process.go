@@ -7,14 +7,21 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync"
-
-	"bytes"
 
 	"mime/multipart"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/deviceio/hmapi"
+	"github.com/google/uuid"
+	"github.com/palantir/stacktrace"
 )
+
+type processReaders struct {
+	items []*io.PipeWriter
+	*sync.RWMutex
+}
 
 type process struct {
 	id            string
@@ -22,11 +29,62 @@ type process struct {
 	mu            *sync.Mutex
 	ctx           context.Context
 	cancel        context.CancelFunc
+	started       bool
 	stdoutPipe    io.ReadCloser
 	stderrPipe    io.ReadCloser
 	stdinPipe     io.WriteCloser
-	stdoutReaders []chan []byte
-	stderrReaders []chan []byte
+	stdoutReaders *processReaders
+	stderrReaders *processReaders
+}
+
+func newProcess(cmd string, args []string) (*process, error) {
+	procid, err := uuid.NewRandom()
+
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "error generating proc id")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	proc := &process{
+		id:     strings.ToLower(procid.String()),
+		cmd:    exec.CommandContext(ctx, cmd, args...),
+		mu:     &sync.Mutex{},
+		ctx:    ctx,
+		cancel: cancel,
+		stdoutReaders: &processReaders{
+			RWMutex: &sync.RWMutex{},
+			items:   []*io.PipeWriter{},
+		},
+		stderrReaders: &processReaders{
+			RWMutex: &sync.RWMutex{},
+			items:   []*io.PipeWriter{},
+		},
+	}
+
+	stdoutPipe, err := proc.cmd.StdoutPipe()
+
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "error creating stdout pipe")
+	}
+
+	stderrPipe, err := proc.cmd.StderrPipe()
+
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "error creating stderr pipe")
+	}
+
+	stdinPipe, err := proc.cmd.StdinPipe()
+
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "error creating stdin pipe")
+	}
+
+	proc.stdoutPipe = stdoutPipe
+	proc.stderrPipe = stderrPipe
+	proc.stdinPipe = stdinPipe
+
+	return proc, nil
 }
 
 func (t *process) get(rw http.ResponseWriter, r *http.Request) {
@@ -55,16 +113,6 @@ func (t *process) get(rw http.ResponseWriter, r *http.Request) {
 				Enctype: hmapi.MediaTypeMultipartFormData,
 				Method:  hmapi.DELETE,
 			},
-			"start": &hmapi.Form{
-				Action:  fmt.Sprintf("%v/process/%v/start", parentPath, t.id),
-				Enctype: hmapi.MediaTypeMultipartFormData,
-				Method:  hmapi.POST,
-			},
-			"stop": &hmapi.Form{
-				Action:  fmt.Sprintf("%v/process/%v/stop", parentPath, t.id),
-				Enctype: hmapi.MediaTypeMultipartFormData,
-				Method:  hmapi.POST,
-			},
 			"stdin": &hmapi.Form{
 				Action:  fmt.Sprintf("%v/process/%v/stdin", parentPath, t.id),
 				Method:  hmapi.POST,
@@ -91,7 +139,25 @@ func (t *process) get(rw http.ResponseWriter, r *http.Request) {
 				Type:  hmapi.MediaTypeJSON,
 				Value: t.cmd.Args,
 			},
+			"started": &hmapi.Content{
+				Type:  hmapi.MediaTypeHMAPIBoolean,
+				Value: t.started,
+			},
 		},
+	}
+
+	if t.started {
+		resource.Forms["stop"] = &hmapi.Form{
+			Action:  fmt.Sprintf("%v/process/%v/stop", parentPath, t.id),
+			Enctype: hmapi.MediaTypeMultipartFormData,
+			Method:  hmapi.POST,
+		}
+	} else {
+		resource.Forms["start"] = &hmapi.Form{
+			Action:  fmt.Sprintf("%v/process/%v/start", parentPath, t.id),
+			Enctype: hmapi.MediaTypeMultipartFormData,
+			Method:  hmapi.POST,
+		}
 	}
 
 	rw.Header().Set("Content-Type", hmapi.MediaTypeJSON.String())
@@ -100,7 +166,12 @@ func (t *process) get(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (t *process) start(rw http.ResponseWriter, r *http.Request) {
-	stdoutPipe, err := t.cmd.StdoutPipe()
+	if t.started {
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte("process already started"))
+	}
+
+	err := t.cmd.Start()
 
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -108,80 +179,80 @@ func (t *process) start(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t.stdoutPipe = stdoutPipe
-
-	stderrPipe, err := t.cmd.StderrPipe()
-
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	t.stderrPipe = stderrPipe
-
-	stdinPipe, err := t.cmd.StdinPipe()
-
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	t.stdinPipe = stdinPipe
-
-	err = t.cmd.Start()
-
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	go func() {
-		t.cmd.Wait()
-		t.cancel()
-	}()
-
-	var stdoutbuf bytes.Buffer
-	var stderrbuf bytes.Buffer
+	stdoutbuf := make([]byte, 250000)
+	stderrbuf := make([]byte, 250000)
 
 	go func(t *process) {
 		for {
-			select {
-			case <-t.ctx.Done():
-				return
-			default:
-				break
-			}
-
-			t.mu.Lock()
-
-			stdoutn, _ := io.Copy(&stdoutbuf, t.stdoutPipe)
-			stderrn, _ := io.Copy(&stderrbuf, t.stderrPipe)
+			stdoutn, err := t.stdoutPipe.Read(stdoutbuf)
 
 			if stdoutn > 0 {
-				for _, reader := range t.stdoutReaders {
-					go func(ch chan []byte, b []byte) {
-						ch <- b
-					}(reader, stdoutbuf.Bytes()[:stdoutn])
+				data := stdoutbuf[:stdoutn]
+
+				t.stdoutReaders.RLock()
+				for _, reader := range t.stdoutReaders.items {
+					if _, err := reader.Write(data); err != nil {
+						reader.Close()
+					}
 				}
+				t.stdoutReaders.RUnlock()
 			}
+
+			if err != nil {
+				t.stdoutReaders.RLock()
+				for _, reader := range t.stdoutReaders.items {
+					reader.Close()
+				}
+				t.stdoutReaders.RUnlock()
+				break
+			}
+		}
+
+		err := t.cmd.Wait()
+
+		if err != nil {
+			logrus.WithField("error", err.Error()).Error("cmd exited with error")
+		}
+
+		t.cancel()
+	}(t)
+
+	go func(t *process) {
+		for {
+			stderrn, err := t.stderrPipe.Read(stderrbuf)
 
 			if stderrn > 0 {
-				for _, reader := range t.stderrReaders {
-					go func(ch chan []byte, b []byte) {
-						ch <- b
-					}(reader, stderrbuf.Bytes()[:stderrn])
+				data := stderrbuf[:stderrn]
+
+				t.stderrReaders.RLock()
+				for _, reader := range t.stderrReaders.items {
+					if _, err := reader.Write(data); err != nil {
+						reader.Close()
+					}
 				}
+				t.stderrReaders.RUnlock()
 			}
 
-			t.mu.Unlock()
+			if err != nil {
+				t.stderrReaders.RLock()
+				for _, reader := range t.stderrReaders.items {
+					reader.Close()
+				}
+				t.stderrReaders.RUnlock()
+				break
+			}
 		}
 	}(t)
+
+	t.started = true
 }
 
 func (t *process) stop(rw http.ResponseWriter, r *http.Request) {
+	if !t.started {
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte("process not started"))
+	}
+
 	t.cancel()
 }
 
@@ -214,10 +285,11 @@ func (t *process) stdin(rw http.ResponseWriter, r *http.Request) {
 	buf := make([]byte, 250000)
 	chdata := make(chan []byte)
 	cherr := make(chan error)
+	done := make(chan bool)
 
 	go func() {
 		for {
-			n, err := r.Body.Read(buf)
+			n, err := data.Read(buf)
 
 			if n > 0 {
 				chdata <- buf[:n]
@@ -228,6 +300,7 @@ func (t *process) stdin(rw http.ResponseWriter, r *http.Request) {
 			}
 
 			if err == io.EOF {
+				done <- true
 				return
 			}
 		}
@@ -235,6 +308,8 @@ func (t *process) stdin(rw http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
+		case <-done:
+			return
 		case <-t.ctx.Done():
 			return
 		case <-close:
@@ -259,39 +334,32 @@ func (t *process) stdout(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	flush := rw.(http.Flusher).Flush
-	close := rw.(http.CloseNotifier).CloseNotify()
 
-	t.mu.Lock()
-	ch := make(chan []byte)
-	t.stdoutReaders = append(t.stdoutReaders, ch)
-	t.mu.Unlock()
+	t.stdoutReaders.Lock()
+	piper, pipew := io.Pipe()
+	t.stdoutReaders.items = append(t.stdoutReaders.items, pipew)
+	t.stdoutReaders.Unlock()
 
 	rw.Header().Set("Trailer", "Error")
 	rw.Header().Set("Content-Type", hmapi.MediaTypeOctetStream.String())
 	rw.WriteHeader(http.StatusOK)
 	flush()
 
-	defer func() {
-		t.mu.Lock()
-		defer t.mu.Unlock()
-
-		for a, reader := range t.stdoutReaders {
-			if reader == ch {
-				t.stdoutReaders = append(t.stdoutReaders[:a], t.stdoutReaders[a+1:]...)
-				return
-			}
-		}
-	}()
+	buf := make([]byte, 250000)
 
 	for {
-		select {
-		case <-t.ctx.Done():
-			return
-		case <-close:
-			return
-		case data := <-ch:
-			rw.Write(data)
+		n, err := piper.Read(buf)
+
+		if n > 0 {
+			rw.Write(buf[:n])
 			flush()
+		}
+
+		if err != nil {
+			if err != io.EOF {
+				rw.Header().Set("Error", err.Error())
+			}
+			return
 		}
 	}
 }
@@ -306,39 +374,32 @@ func (t *process) stderr(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	flush := rw.(http.Flusher).Flush
-	close := rw.(http.CloseNotifier).CloseNotify()
 
-	t.mu.Lock()
-	ch := make(chan []byte)
-	t.stderrReaders = append(t.stderrReaders, ch)
-	t.mu.Unlock()
+	t.stderrReaders.Lock()
+	piper, pipew := io.Pipe()
+	t.stderrReaders.items = append(t.stderrReaders.items, pipew)
+	t.stderrReaders.Unlock()
 
 	rw.Header().Set("Trailer", "Error")
 	rw.Header().Set("Content-Type", hmapi.MediaTypeOctetStream.String())
 	rw.WriteHeader(http.StatusOK)
 	flush()
 
-	defer func() {
-		t.mu.Lock()
-		defer t.mu.Unlock()
-
-		for a, reader := range t.stderrReaders {
-			if reader == ch {
-				t.stderrReaders = append(t.stderrReaders[:a], t.stderrReaders[a+1:]...)
-				return
-			}
-		}
-	}()
+	buf := make([]byte, 250000)
 
 	for {
-		select {
-		case <-t.ctx.Done():
-			return
-		case <-close:
-			return
-		case data := <-ch:
-			rw.Write(data)
+		n, err := piper.Read(buf)
+
+		if n > 0 {
+			rw.Write(buf[:n])
 			flush()
+		}
+
+		if err != nil {
+			if err != io.EOF {
+				rw.Header().Set("Error", err.Error())
+			}
+			return
 		}
 	}
 }

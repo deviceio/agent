@@ -26,6 +26,12 @@
   revision = "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/deviceio/dsc"
   packages = ["."]
@@ -35,13 +41,13 @@
   branch = "master"
   name = "github.com/deviceio/hmapi"
   packages = ["."]
-  revision = "f099ba52e839c6a9e04dc1bc8f147475301ba716"
+  revision = "cfb7a1b081c272a8679b8c174380ca1ee8c267fa"
 
 [[projects]]
   branch = "master"
   name = "github.com/deviceio/shared"
   packages = ["logging"]
-  revision = "d0178d4b8d35939753b91c90d9160539f7adf135"
+  revision = "bc67982208cefd6450d6deb2c1bf6e0ce6184c14"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -104,6 +110,12 @@
   revision = "d0303fe809921458f417bcf828397a65db30a7e4"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/palantir/stacktrace"
+  packages = [".","cleanpath"]
+  revision = "78658fd2d1772b755720ed8c44367d11ee5380d6"
+
+[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -113,6 +125,12 @@
   name = "github.com/pelletier/go-toml"
   packages = ["."]
   revision = "5ccdfb18c776b740aecaf085c4d9a2779199c279"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
@@ -143,19 +161,25 @@
   branch = "master"
   name = "github.com/spf13/viper"
   packages = ["."]
-  revision = "0967fc9aceab2ce9da34061253ac10fb99bba5b2"
+  revision = "a1ecfa6a20bd4ef9e9caded262ee1b1b26847675"
+
+[[projects]]
+  name = "github.com/stretchr/testify"
+  packages = ["assert","require","suite"]
+  revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
+  version = "v1.1.4"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows","windows/svc","windows/svc/mgr"]
-  revision = "b90f89a1e7a9c1f6b918820b3daa7f08488c8594"
+  revision = "0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","transform","unicode/cldr","unicode/norm"]
-  revision = "ccbd3f7822129ff389f8ca4858a9b9d4d910531c"
+  revision = "3491b61b9edc56653ad4333e605e2908e46a036b"
 
 [[projects]]
   branch = "v2"
@@ -166,6 +190,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "81ed9059ed42a96e7751c9df40dff8418cc4f58688a6122a64c868deaa7c3553"
+  inputs-digest = "9a194cc3823c5317a5f5252f74ef1a4c392745c0ce8724e80dcd20eb569d4e9c"
   solver-name = "gps-cdcl"
   solver-version = 1

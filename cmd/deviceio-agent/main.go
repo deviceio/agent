@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/alecthomas/kingpin"
-	_ "github.com/deviceio/agent/resources"
-	_ "github.com/deviceio/agent/resources/filesystem"
-	_ "github.com/deviceio/agent/resources/process"
+	"github.com/deviceio/agent/resources"
+	"github.com/deviceio/agent/resources/filesystem"
+	"github.com/deviceio/agent/resources/process"
 	"github.com/deviceio/agent/transport"
-	"github.com/deviceio/shared/logging"
+	"github.com/gorilla/mux"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -72,13 +72,22 @@ func main() {
 
 	log.Println("Using configuration file: ", viper.ConfigFileUsed())
 
-	transport.NewConnection(&logging.DefaultLogger{}).Dial(&transport.ConnectionOpts{
+	router := mux.NewRouter()
+
+	conn := transport.NewConnection(&transport.ConnectionConfig{
 		ID:   viper.GetString("id"),
 		Tags: viper.GetStringSlice("tags"),
 		TransportAllowSelfSigned: viper.GetBool("transport.allow_self_signed"),
 		TransportHost:            viper.GetString("transport.host"),
 		TransportPort:            viper.GetInt("transport.port"),
+		Router:                   router,
 	})
+
+	resources.RegisterRoutes(router)
+	process.RegisterRoutes(router)
+	filesystem.RegisterRoutes(router)
+
+	conn.Dial()
 
 	<-make(chan bool)
 }

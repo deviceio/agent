@@ -14,11 +14,11 @@ import (
 	"github.com/deviceio/shared/logging"
 )
 
-type Root struct {
+type root struct {
 	logger logging.Logger
 }
 
-func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
+func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 
 	resource := &hmapi.Resource{
@@ -82,7 +82,7 @@ func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(&resource)
 }
 
-func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
+func (t *root) read(w http.ResponseWriter, r *http.Request) {
 	var file *os.File
 	var err error
 	var count int64 = -1
@@ -187,7 +187,7 @@ func (t *Root) Read(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *Root) Write(rw http.ResponseWriter, r *http.Request) {
+func (t *root) write(rw http.ResponseWriter, r *http.Request) {
 	var file *os.File
 	var form *multipart.Reader
 	var err error

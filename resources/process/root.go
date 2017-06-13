@@ -1,29 +1,28 @@
 package process
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os/exec"
+	"strings"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/deviceio/hmapi"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
-type Root struct {
-	Itemsmu *sync.Mutex
-	Items   map[string]*process
+type root struct {
+	itemsmu *sync.Mutex
+	items   map[string]*process
 }
 
-func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
+func (t *root) get(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 
 	resource := &hmapi.Resource{
 		Forms: map[string]*hmapi.Form{
-			"create-process": &hmapi.Form{
+			"create": &hmapi.Form{
 				Action:  parentPath + "/process",
 				Method:  hmapi.POST,
 				Enctype: hmapi.MediaTypeMultipartFormData,
@@ -45,15 +44,15 @@ func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 		Links:   map[string]*hmapi.Link{},
 	}
 
-	t.Itemsmu.Lock()
-	defer t.Itemsmu.Unlock()
+	t.itemsmu.Lock()
+	defer t.itemsmu.Unlock()
 
 	resource.Content["process-list"] = &hmapi.Content{
 		Type:  hmapi.MediaTypeJSON,
-		Value: t.Items,
+		Value: t.items,
 	}
 
-	for id := range t.Items {
+	for id := range t.items {
 		resource.Links[id] = &hmapi.Link{
 			Href: parentPath + "/process/" + id,
 			Type: hmapi.MediaTypeHMAPIResource,
@@ -65,7 +64,7 @@ func (t *Root) Get(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(&resource)
 }
 
-func (t *Root) CreateProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) createProcess(rw http.ResponseWriter, r *http.Request) {
 	parentPath := r.Header.Get("X-Deviceio-Parent-Path")
 	formReader, err := r.MultipartReader()
 
@@ -105,37 +104,33 @@ func (t *Root) CreateProcess(rw http.ResponseWriter, r *http.Request) {
 		args = []string{}
 	}
 
-	t.Itemsmu.Lock()
-	defer t.Itemsmu.Unlock()
+	t.itemsmu.Lock()
+	defer t.itemsmu.Unlock()
 
-	procid, _ := uuid.NewRandom()
+	proc, err := newProcess(cmdstr, args)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	proc := &process{
-		id:     procid.String(),
-		cmd:    exec.CommandContext(ctx, cmdstr, args...),
-		mu:     &sync.Mutex{},
-		ctx:    ctx,
-		cancel: cancel,
+	if err != nil {
+		logrus.WithField("error", err.Error()).Error("failed to create new process")
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte("failed to create process. check agent logs for more details"))
+		return
 	}
 
-	t.Items[procid.String()] = proc
+	t.items[proc.id] = proc
 
 	rw.Header().Set("Location", fmt.Sprintf(
 		"%v/%v/%v",
 		parentPath,
 		"process",
-		procid.String(),
+		proc.id,
 	))
 
 	rw.WriteHeader(http.StatusCreated)
-	rw.Write([]byte(""))
 }
 
-func (t *Root) GetProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) getProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -146,9 +141,9 @@ func (t *Root) GetProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.get(rw, r)
 }
 
-func (t *Root) DeleteProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) deleteProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -157,14 +152,15 @@ func (t *Root) DeleteProcess(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	proc.cancel()
-	delete(t.Items, vars["proc-id"])
+
+	delete(t.items, vars["proc"])
 
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (t *Root) StartProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) startProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -175,9 +171,9 @@ func (t *Root) StartProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.start(rw, r)
 }
 
-func (t *Root) StopProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) stopProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -188,9 +184,9 @@ func (t *Root) StopProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stop(rw, r)
 }
 
-func (t *Root) StdinProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) stdinProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -201,9 +197,9 @@ func (t *Root) StdinProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stdin(rw, r)
 }
 
-func (t *Root) StdoutProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) stdoutProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -214,9 +210,9 @@ func (t *Root) StdoutProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stdout(rw, r)
 }
 
-func (t *Root) StderrProcess(rw http.ResponseWriter, r *http.Request) {
+func (t *root) stderrProcess(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	proc := t.findProcessItem(vars["proc-id"])
+	proc := t.findProcessItem(vars["proc"])
 
 	if proc == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -227,11 +223,11 @@ func (t *Root) StderrProcess(rw http.ResponseWriter, r *http.Request) {
 	proc.stderr(rw, r)
 }
 
-func (t *Root) findProcessItem(processid string) *process {
-	t.Itemsmu.Lock()
-	defer t.Itemsmu.Unlock()
+func (t *root) findProcessItem(processid string) *process {
+	t.itemsmu.Lock()
+	defer t.itemsmu.Unlock()
 
-	proc, ok := t.Items[processid]
+	proc, ok := t.items[strings.ToLower(processid)]
 
 	if !ok {
 		return nil

@@ -1,16 +1,16 @@
 package filesystem
 
 import (
-	"github.com/deviceio/agent/transport"
 	"github.com/deviceio/shared/logging"
+	"github.com/gorilla/mux"
 )
 
-func init() {
-	fs := &Root{
+func RegisterRoutes(router *mux.Router) {
+	r := &root{
 		logger: &logging.DefaultLogger{},
 	}
 
-	transport.Router.HandleFunc("/filesystem", fs.Get).Methods("GET")
-	transport.Router.HandleFunc("/filesystem/read", fs.Read).Methods("POST")
-	transport.Router.HandleFunc("/filesystem/write", fs.Write).Methods("POST")
+	router.HandleFunc("/filesystem", r.get).Methods("GET")
+	router.HandleFunc("/filesystem/read", r.read).Methods("POST")
+	router.HandleFunc("/filesystem/write", r.write).Methods("POST")
 }

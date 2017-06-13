@@ -11,33 +11,40 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/deviceio/shared/logging"
+	"github.com/gorilla/mux"
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 )
 
+type ConnectionConfig struct {
+	ID                         string
+	Tags                       []string
+	TransportAllowSelfSigned   bool
+	TransportDisableKeyPinning bool
+	TransportHost              string
+	TransportPasscodeHash      string
+	TransportPasscodeSalt      string
+	TransportPort              int
+	Router                     *mux.Router
+}
+
 // Connection represents our upstream connection to a hub.
 type Connection struct {
-	opts      *ConnectionOpts
-	reconnect int
-	jitter    int
-	backoff   *backoff.Backoff
-	logger    logging.Logger
+	config  *ConnectionConfig
+	backoff *backoff.Backoff
 }
 
 // NewConnection creates a new instance of the Connection type
-func NewConnection(logger logging.Logger) *Connection {
+func NewConnection(config *ConnectionConfig) *Connection {
 	return &Connection{
-		logger: logger,
+		config: config,
 	}
 }
 
 // Dial attempts to connect to the upstream hub. If dialing fails a backoff
 // algorithm is applied during reconnection attempts to alleviate load on a hub
 // that disappears momentarily.
-func (t *Connection) Dial(opts *ConnectionOpts) {
-	t.opts = opts
-
+func (t *Connection) Dial() {
 	t.backoff = &backoff.Backoff{
 		Max:    5 * time.Second,
 		Jitter: true,
@@ -47,8 +54,8 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 		err := t.run()
 
 		logrus.WithFields(logrus.Fields{
-			"host":  t.opts.TransportHost,
-			"port":  t.opts.TransportPort,
+			"host":  t.config.TransportHost,
+			"port":  t.config.TransportPort,
 			"error": err.Error(),
 		}).Warn("transport failure")
 
@@ -59,8 +66,8 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 		}
 
 		logrus.WithFields(logrus.Fields{
-			"host": t.opts.TransportHost,
-			"port": t.opts.TransportPort,
+			"host": t.config.TransportHost,
+			"port": t.config.TransportPort,
 			"wait": wait,
 		}).Info("transport retry")
 
@@ -71,10 +78,10 @@ func (t *Connection) Dial(opts *ConnectionOpts) {
 // run conducts the setup of the multiplexed tcp stream server to the hub and registers
 // the base http server to be served over the multiplexed connection.
 func (t *Connection) run() error {
-	dialaddr := fmt.Sprintf("%v:%v", t.opts.TransportHost, t.opts.TransportPort)
+	dialaddr := fmt.Sprintf("%v:%v", t.config.TransportHost, t.config.TransportPort)
 
 	conn, err := tls.Dial("tcp", dialaddr, &tls.Config{
-		InsecureSkipVerify: t.opts.TransportAllowSelfSigned,
+		InsecureSkipVerify: t.config.TransportAllowSelfSigned,
 	})
 
 	if err != nil {
@@ -92,9 +99,14 @@ func (t *Connection) run() error {
 		return err
 	}
 
-	Router.HandleFunc("/info", t.httpGetInfo)
+	httpmux := http.NewServeMux()
 
-	return http.Serve(server, Router)
+	httpmux.Handle("/", t.config.Router)
+	httpmux.HandleFunc("/info", t.httpGetInfo)
+
+	go http.ListenAndServe(":5151", httpmux)
+
+	return http.Serve(server, httpmux)
 }
 
 // httpGetInfo provides basic information about this device a hub needs to properly
@@ -117,15 +129,15 @@ func (t *Connection) httpGetInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	err = json.NewEncoder(w).Encode(&info{
-		ID:           t.opts.ID,
-		Tags:         t.opts.Tags,
+		ID:           t.config.ID,
+		Tags:         t.config.Tags,
 		Hostname:     hostname,
 		Architecture: runtime.GOARCH,
 		Platform:     runtime.GOOS,
 	})
 
 	if err != nil {
-		t.logger.Error(err.Error())
+		logrus.WithField("error", err.Error()).Error("error encoding json info")
 		w.WriteHeader(500)
 		w.Write([]byte(""))
 		return

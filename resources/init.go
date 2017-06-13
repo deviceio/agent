@@ -1,9 +1,9 @@
 package resources
 
-import "github.com/deviceio/agent/transport"
+import "github.com/gorilla/mux"
 
-func init() {
+func RegisterRoutes(router *mux.Router) {
 	r := &root{}
-	transport.Router.HandleFunc("/", r.get).Methods("GET")
-	transport.Router.HandleFunc("/chunk-response-test", r.chunkedResponseTest).Methods("GET")
+	router.HandleFunc("/", r.get).Methods("GET")
+	router.HandleFunc("/chunk-response-test", r.chunkedResponseTest).Methods("GET")
 }
