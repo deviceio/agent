@@ -104,8 +104,6 @@ func (t *Connection) run() error {
 	httpmux.Handle("/", t.config.Router)
 	httpmux.HandleFunc("/info", t.httpGetInfo)
 
-	go http.ListenAndServe(":5151", httpmux)
-
 	return http.Serve(server, httpmux)
 }
 
