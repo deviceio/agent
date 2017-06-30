@@ -56,6 +56,7 @@ func main() {
 	viper.AddConfigPath("c:/ProgramData/deviceio/agent/")
 	viper.AddConfigPath(".")
 
+	viper.SetDefault("id", "")
 	viper.SetDefault("tags", []string{})
 	viper.SetDefault("transport.host", "127.0.0.1")
 	viper.SetDefault("transport.port", 8975)
